@@ -115,6 +115,36 @@
       object-fit: cover !important;
       border-radius: 14px;
     }
+    .paused-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 50px;
+      background: rgba(3, 10, 5, 0.88);
+      backdrop-filter: blur(6px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+      cursor: pointer;
+      text-align: center;
+      padding: 20px;
+    }
+    .paused-title {
+      font-family: 'Cinzel', serif;
+      font-weight: 700;
+      color: var(--gold);
+      font-size: 1.1rem;
+      margin-top: 10px;
+      letter-spacing: 1px;
+    }
+    .paused-sub {
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      margin-top: 5px;
+    }
 
     /* Scanner controls */
     .controls {
@@ -316,6 +346,11 @@
 
   <div class="scanner-card">
     <div id="reader"></div>
+    <div class="paused-overlay" id="pausedOverlay" style="display:none;" onclick="toggleScanner()">
+      <div class="paused-icon"><i data-lucide="pause-circle" style="width:3.2rem;height:3.2rem;color:var(--gold);"></i></div>
+      <div class="paused-title">SCANNER PAUSED</div>
+      <div class="paused-sub">Tap anywhere or press Resume to scan</div>
+    </div>
     <div class="controls">
       <button class="ctrl-btn active" id="toggleBtn" onclick="toggleScanner()">
         <span id="btnIcon"><i data-lucide="pause"></i></span> <span id="btnText">Pause Scanner</span>
@@ -436,15 +471,49 @@
     }
 
     // Initialize HTML5 QR Scanner
+    var isStarting = false;
+
     function startScanner() {
-      if (html5QrCode) {
-        html5QrCode.stop().then(initAndStart).catch(initAndStart);
-      } else {
+      if (isStarting) return;
+      isStarting = true;
+
+      stopScannerSafely(function() {
         initAndStart();
+      });
+    }
+
+    function stopScannerSafely(callback) {
+      if (!html5QrCode) {
+        if (callback) callback();
+        return;
       }
+
+      try {
+        var state = html5QrCode.getState();
+        // State 2: SCANNING, State 3: PAUSED
+        if (state === 2 || state === 3) {
+          html5QrCode.stop().then(function() {
+            try { html5QrCode.clear(); } catch(e) {}
+            if (callback) callback();
+          }).catch(function(err) {
+            console.warn("Safe stop catch:", err);
+            try { html5QrCode.clear(); } catch(e) {}
+            if (callback) callback();
+          });
+          return;
+        }
+      } catch (e) {
+        console.warn("Safe stop error:", e);
+      }
+
+      try { html5QrCode.clear(); } catch(e) {}
+      if (callback) callback();
     }
 
     function initAndStart() {
+      var readerEl = document.getElementById("reader");
+      if (readerEl) readerEl.innerHTML = "";
+
       html5QrCode = new Html5Qrcode("reader");
       var config = {
         fps: 15,
@@ -458,29 +527,63 @@
         onQrScanned,
         function(err) { /* ignore continuous scan search frames */ }
       ).then(function() {
-        isScanning = true;
-        document.getElementById('btnIcon').innerHTML = '<i data-lucide="pause"></i>';
-        if(typeof lucide !== 'undefined') lucide.createIcons();
-        document.getElementById('btnText').textContent = 'Pause Scanner';
-        document.getElementById('toggleBtn').classList.add('active');
+        isStarting = false;
+        setScannerButtonState(true);
       }).catch(function(err) {
+        isStarting = false;
         console.error("Camera error:", err);
+        setScannerButtonState(false);
         alert("Camera permission denied or camera not found. You can still use the Manual Check-In box below.");
       });
     }
 
     function toggleScanner() {
-      if (isScanning) {
-        html5QrCode.stop().then(function() {
-          isScanning = false;
-          document.getElementById('btnIcon').innerHTML = '<i data-lucide="play"></i>';
-          if(typeof lucide !== 'undefined') lucide.createIcons();
-          document.getElementById('btnText').textContent = 'Resume Scanner';
-          document.getElementById('toggleBtn').classList.remove('active');
-        });
-      } else {
+      if (!html5QrCode) {
         startScanner();
+        return;
       }
+
+      try {
+        var state = html5QrCode.getState();
+        // If actively scanning (2) -> Pause decoding without killing camera stream
+        if (state === 2) {
+          html5QrCode.pause(false);
+          setScannerButtonState(false);
+          return;
+        }
+        // If paused (3) -> Resume decoding immediately
+        if (state === 3) {
+          html5QrCode.resume();
+          setScannerButtonState(true);
+          return;
+        }
+      } catch (err) {
+        console.warn("Toggle pause/resume error, trying full restart:", err);
+      }
+
+      // If in NOT_STARTED (1) or unknown, perform clean start
+      startScanner();
+    }
+
+    function setScannerButtonState(isActive) {
+      isScanning = isActive;
+      var btn = document.getElementById('toggleBtn');
+      var icon = document.getElementById('btnIcon');
+      var text = document.getElementById('btnText');
+      var overlay = document.getElementById('pausedOverlay');
+
+      if (isActive) {
+        if (icon) icon.innerHTML = '<i data-lucide="pause"></i>';
+        if (text) text.textContent = 'Pause Scanner';
+        if (btn) btn.classList.add('active');
+        if (overlay) overlay.style.display = 'none';
+      } else {
+        if (icon) icon.innerHTML = '<i data-lucide="play"></i>';
+        if (text) text.textContent = 'Resume Scanner';
+        if (btn) btn.classList.remove('active');
+        if (overlay) overlay.style.display = 'flex';
+      }
+      if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     function switchCamera() {
