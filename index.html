@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REDEUS'26 — Gate Entry Scanner</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/><circle cx='12' cy='13' r='3'/></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Local HTML5 QR Scanner library (Offline ready) -->
+  <script src="html5-qrcode.min.js"></script>
+  <style>
+    [data-lucide]{display:inline-block;width:1em;height:1em;vertical-align:middle;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050e07;
+      --bg-deep: #030704;
+      --bg-card: rgba(6, 16, 8, 0.92);
+      --gold: #d4af37;
+      --gold-sec: #c9a84c;
+      --gold-dark: #b8942e;
+      --text: #f0e6d0;
+      --text-muted: #859676;
+      --success: #2ecc71;
+      --error: #e74c3c;
+    }
+    html { overflow-x: hidden !important; max-width: 100% !important; width: 100% !important; }
+    body {
+      min-height: 100vh;
+      overflow-x: hidden !important;
+      max-width: 100% !important;
+      width: 100% !important;
+      background: radial-gradient(ellipse 70% 60% at 50% 25%, #0b2011 0%, #050e07 65%, #030704 100%);
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 15px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 15px;
+      width: 100%;
+      max-width: 480px;
+    }
+    .college {
+      font-family: 'Cinzel', serif;
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      color: var(--gold-sec);
+      text-transform: uppercase;
+    }
+    .event-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.6rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--gold-dark), var(--gold), #f0d060);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 2px 0;
+    }
+    .scanner-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* Headcount stats banner */
+    .headcount-bar {
+      width: 100%;
+      max-width: 480px;
+      background: var(--bg-card);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      border-radius: 12px;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .stat-item {
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--gold);
+    }
+    .stat-lbl {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .stat-item.admitted .stat-val { color: var(--success); }
+
+    /* Scanner Viewport */
+    .scanner-card {
+      width: 100%;
+      max-width: 480px;
+      background: var(--bg-card);
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      border-radius: 16px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+    }
+    #reader {
+      width: 100%;
+      min-height: 280px;
+      background: #000;
+    }
+    #reader video {
+      object-fit: cover !important;
+      border-radius: 14px;
+    }
+
+    /* Scanner controls */
+    .controls {
+      padding: 12px 16px;
+      display: flex;
+      gap: 10px;
+      background: rgba(8, 25, 8, 0.8);
+      border-top: 1px solid rgba(212, 175, 55, 0.2);
+    }
+    .ctrl-btn {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid var(--gold);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--gold);
+      font-family: 'Cinzel', serif;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .ctrl-btn.active {
+      background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+      color: #061206;
+    }
+
+    /* Manual search input */
+    .manual-box {
+      width: 100%;
+      max-width: 480px;
+      margin-top: 15px;
+      background: var(--bg-card);
+      border: 1px solid rgba(212, 175, 55, 0.25);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .manual-title {
+      font-size: 0.78rem;
+      color: var(--gold-sec);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .manual-row {
+      display: flex;
+      gap: 8px;
+    }
+    .manual-input {
+      flex: 1;
+      padding: 9px 12px;
+      background: rgba(8, 25, 8, 0.8);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .manual-btn {
+      padding: 9px 16px;
+      background: var(--gold);
+      color: #061206;
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    /* Full-Screen Result Overlay */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 25px;
+      text-align: center;
+      animation: popIn 0.25s ease-out;
+    }
+    .overlay.success {
+      display: flex;
+      background: rgba(10, 40, 15, 0.96);
+      border: 4px solid var(--success);
+    }
+    .overlay.error {
+      display: flex;
+      background: rgba(50, 10, 10, 0.96);
+      border: 4px solid var(--error);
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .overlay-icon {
+      font-size: 4.5rem;
+      margin-bottom: 10px;
+    }
+    .overlay-title {
+      font-family: 'Cinzel', serif;
+      font-size: 2.2rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .overlay.success .overlay-title { color: var(--success); }
+    .overlay.error .overlay-title { color: var(--error); }
+    .overlay-name {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 6px;
+    }
+    .overlay-sub {
+      font-size: 1rem;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+    .overlay-details {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .overlay-dismiss-btn {
+      padding: 12px 30px;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      background: #ffffff;
+      color: #061206;
+    }
+
+    /* Recent Scans Log */
+    .recent-scans {
+      width: 100%;
+      max-width: 480px;
+      margin-top: 15px;
+      margin-bottom: 30px;
+    }
+    .recent-header {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .recent-list {
+      background: var(--bg-card);
+      border: 1px solid rgba(212, 175, 55, 0.2);
+      border-radius: 10px;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    .recent-item {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+    }
+    .recent-item:last-child { border-bottom: none; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <p class="college">St. Benedict's College</p>
+    <div style="max-width: 330px; margin: 4px auto 6px; position: relative;">
+      <img src="redeus-title.png" alt="REDEUS'26 - From the First Day to the Final Bow - The Official Batch Gathering" style="width: 100%; height: auto; display: block; border-radius: 8px; filter: drop-shadow(0 4px 15px rgba(0,0,0,0.6));" onerror="this.style.display='none'; document.getElementById('titleFallback').style.display='block';">
+      <h1 id="titleFallback" class="event-title" style="display:none; margin: 6px 0;">REDEUS'26</h1>
+    </div>
+    <p class="scanner-label"><i data-lucide="scan-line"></i> Gate Entry Scanner</p>
+  </div>
+
+  <div class="headcount-bar">
+    <div class="stat-item">
+      <div class="stat-val" id="totalApproved">0</div>
+      <div class="stat-lbl">Approved</div>
+    </div>
+    <div class="stat-item admitted">
+      <div class="stat-val" id="totalAdmitted">0</div>
+      <div class="stat-lbl">Admitted</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val" id="totalRemaining">0</div>
+      <div class="stat-lbl">Remaining</div>
+    </div>
+  </div>
+
+  <div class="scanner-card">
+    <div id="reader"></div>
+    <div class="controls">
+      <button class="ctrl-btn active" id="toggleBtn" onclick="toggleScanner()">
+        <span id="btnIcon"><i data-lucide="pause"></i></span> <span id="btnText">Pause Scanner</span>
+      </button>
+      <button class="ctrl-btn" onclick="switchCamera()">
+        <i data-lucide="refresh-cw"></i> Switch Camera
+      </button>
+    </div>
+  </div>
+
+  <div class="manual-box">
+    <div class="manual-title"><i data-lucide="search"></i> Manual Check-In (Cracked Screen / Low Battery)</div>
+    <div class="manual-row">
+      <input type="text" class="manual-input" id="manualInput" placeholder="Enter Ref ID (e.g. RED-XYZ) or Name">
+      <button class="manual-btn" onclick="manualCheckIn()">Admit</button>
+    </div>
+  </div>
+
+  <div class="recent-scans">
+    <div class="recent-header">Recent Gate Entries</div>
+    <div class="recent-list" id="recentList">
+      <div class="recent-item" style="color:var(--text-muted); text-align:center; display:block;">No scans yet</div>
+    </div>
+  </div>
+
+  <!-- Result Overlay -->
+  <div class="overlay" id="resultOverlay" onclick="dismissOverlay()">
+    <div class="overlay-icon" id="overlayIcon">✅</div>
+    <div class="overlay-title" id="overlayTitle">WELCOME!</div>
+    <div class="overlay-name" id="overlayName">Student Name</div>
+    <div class="overlay-sub" id="overlaySub">1 Person • 2023 O/L Science</div>
+    <div class="overlay-details" id="overlayDetails">Pass Verified Successfully</div>
+    <button class="overlay-dismiss-btn" onclick="dismissOverlay()">Next Student →</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script>
+    var DB_URL = 'https://batch-party-69ac1-default-rtdb.firebaseio.com';
+    var QR_SECRET = 'REDEUS26-QR-SECRET-2026';
+
+    var html5QrCode = null;
+    var isScanning = false;
+    var currentFacingMode = "environment"; // Back camera
+    var allTickets = {};
+    var isProcessing = false;
+    var overlayTimeout = null;
+
+    // Web Audio API chimes
+    var audioCtx = null;
+    function playChime(isSuccess) {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(function(){});
+
+        var now = audioCtx.currentTime;
+        if (isSuccess) {
+          // Cheerful ascending 2-tone chime
+          var osc1 = audioCtx.createOscillator();
+          var gain1 = audioCtx.createGain();
+          osc1.frequency.setValueAtTime(587.33, now); // D5
+          osc1.frequency.setValueAtTime(880.00, now + 0.12); // A5
+          gain1.gain.setValueAtTime(0.15, now);
+          gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+          osc1.connect(gain1);
+          gain1.connect(audioCtx.destination);
+          osc1.start(now);
+          osc1.stop(now + 0.4);
+        } else {
+          // Low warning buzzer
+          var osc2 = audioCtx.createOscillator();
+          var gain2 = audioCtx.createGain();
+          osc2.type = 'sawtooth';
+          osc2.frequency.setValueAtTime(150, now);
+          gain2.gain.setValueAtTime(0.2, now);
+          gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+          osc2.connect(gain2);
+          gain2.connect(audioCtx.destination);
+          osc2.start(now);
+          osc2.stop(now + 0.5);
+        }
+      } catch(e) {}
+    }
+
+    function vibrate(pattern) {
+      if (navigator.vibrate) {
+        try { navigator.vibrate(pattern); } catch(e) {}
+      }
+    }
+
+    // Load ticket data from Firebase
+    function loadTickets() {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', DB_URL + '/tickets.json', true);
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          allTickets = JSON.parse(xhr.responseText) || {};
+          updateHeadcount();
+        }
+      };
+      xhr.send();
+    }
+    loadTickets();
+    setInterval(loadTickets, 5000);
+
+    function updateHeadcount() {
+      var list = Object.values(allTickets);
+      var approved = list.filter(function(t){ return t.status === 'approved'; });
+      var admitted = approved.filter(function(t){ return t.scanned === true; });
+      var admittedCount = 0;
+      admitted.forEach(function(t) { admittedCount += (t.numTickets || 1); });
+
+      var totalPersons = 0;
+      approved.forEach(function(t) { totalPersons += (t.numTickets || 1); });
+
+      document.getElementById('totalApproved').textContent = totalPersons;
+      document.getElementById('totalAdmitted').textContent = admittedCount;
+      document.getElementById('totalRemaining').textContent = Math.max(0, totalPersons - admittedCount);
+    }
+
+    // Initialize HTML5 QR Scanner
+    function startScanner() {
+      if (html5QrCode) {
+        html5QrCode.stop().then(initAndStart).catch(initAndStart);
+      } else {
+        initAndStart();
+      }
+    }
+
+    function initAndStart() {
+      html5QrCode = new Html5Qrcode("reader");
+      var config = {
+        fps: 15,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+      };
+
+      html5QrCode.start(
+        { facingMode: currentFacingMode },
+        config,
+        onQrScanned,
+        function(err) { /* ignore continuous scan search frames */ }
+      ).then(function() {
+        isScanning = true;
+        document.getElementById('btnIcon').innerHTML = '<i data-lucide="pause"></i>';
+        if(typeof lucide !== 'undefined') lucide.createIcons();
+        document.getElementById('btnText').textContent = 'Pause Scanner';
+        document.getElementById('toggleBtn').classList.add('active');
+      }).catch(function(err) {
+        console.error("Camera error:", err);
+        alert("Camera permission denied or camera not found. You can still use the Manual Check-In box below.");
+      });
+    }
+
+    function toggleScanner() {
+      if (isScanning) {
+        html5QrCode.stop().then(function() {
+          isScanning = false;
+          document.getElementById('btnIcon').innerHTML = '<i data-lucide="play"></i>';
+          if(typeof lucide !== 'undefined') lucide.createIcons();
+          document.getElementById('btnText').textContent = 'Resume Scanner';
+          document.getElementById('toggleBtn').classList.remove('active');
+        });
+      } else {
+        startScanner();
+      }
+    }
+
+    function switchCamera() {
+      currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+      startScanner();
+    }
+
+    // QR Scanned handler
+    function onQrScanned(decodedText) {
+      if (isProcessing) return;
+      isProcessing = true;
+
+      try {
+        var parsed = JSON.parse(decodedText);
+        verifyTicket(parsed.ticketId, parsed.secret, parsed);
+      } catch(e) {
+        // Not a JSON payload, check if it's directly a ticket key or ref ID
+        verifyTicket(decodedText.trim(), null, null);
+      }
+    }
+
+    // Verify against Firebase
+    function verifyTicket(ticketKey, secret, rawData) {
+      var ticket = allTickets[ticketKey];
+
+      // If not found by key, try search by refId
+      if (!ticket) {
+        var foundKey = Object.keys(allTickets).find(function(k) {
+          return allTickets[k].refId && allTickets[k].refId.toLowerCase() === ticketKey.toLowerCase();
+        });
+        if (foundKey) {
+          ticketKey = foundKey;
+          ticket = allTickets[foundKey];
+        }
+      }
+
+      if (!ticket) {
+        showResult(false, 'TICKET NOT FOUND', 'Unknown QR Code', 'This code is not registered in the system.', 'Invalid Pass');
+        return;
+      }
+
+      // Secret check (if present in QR)
+      if (secret && secret !== QR_SECRET) {
+        showResult(false, 'COUNTERFEIT PASS', ticket.fullName, 'Security secret mismatch! Fake ticket detected.', 'Security Alert');
+        return;
+      }
+
+      // Check approval status
+      if (ticket.status !== 'approved') {
+        showResult(false, 'NOT APPROVED', ticket.fullName, 'Ticket status: ' + ticket.status.toUpperCase(), 'Payment unverified');
+        return;
+      }
+
+      // Check duplicate scan
+      if (ticket.scanned === true) {
+        var scannedTime = ticket.scannedAt ? new Date(ticket.scannedAt).toLocaleTimeString() : 'Earlier';
+        showResult(false, 'ALREADY SCANNED!', ticket.fullName, 'Scanned at: ' + scannedTime, 'DO NOT ADMIT — Pass already used');
+        return;
+      }
+
+      // VALID PASS! Mark scanned in Firebase
+      var xhr = new XMLHttpRequest();
+      xhr.open('PATCH', DB_URL + '/tickets/' + ticketKey + '.json', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      var nowIso = new Date().toISOString();
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          ticket.scanned = true;
+          ticket.scannedAt = nowIso;
+          updateHeadcount();
+          addRecentScan(ticket.fullName, ticket.numTickets || 1, true);
+          var subtitle = (ticket.paidTogether && ticket.groupTotal > 1) ?
+            ('Pass ' + (ticket.groupIndex || 1) + ' of ' + ticket.groupTotal + ' • ' + (ticket.batchClass || '')) :
+            ((ticket.numTickets || 1) + ' Persons • ' + (ticket.batchClass || ''));
+          showResult(true, 'WELCOME!', ticket.fullName, subtitle, 'Ref: ' + (ticket.refId || ticketKey));
+        } else {
+          showResult(false, 'NETWORK ERROR', ticket.fullName, 'Failed to update database. Try again.', '');
+        }
+      };
+      xhr.send(JSON.stringify({ scanned: true, scannedAt: nowIso }));
+    }
+
+    // Manual check-in
+    function manualCheckIn() {
+      var val = document.getElementById('manualInput').value.trim();
+      if (!val) return;
+      document.getElementById('manualInput').value = '';
+
+      var foundKey = Object.keys(allTickets).find(function(k) {
+        var t = allTickets[k];
+        return (t.refId && t.refId.toLowerCase() === val.toLowerCase()) ||
+               (t.fullName && t.fullName.toLowerCase().includes(val.toLowerCase())) ||
+               (k.toLowerCase() === val.toLowerCase());
+      });
+
+      if (foundKey) {
+        verifyTicket(foundKey, QR_SECRET, null);
+      } else {
+        showResult(false, 'NOT FOUND', val, 'No ticket matches this name or reference.', 'Manual Lookup');
+      }
+    }
+
+    function showResult(isSuccess, title, name, sub, details) {
+      if (overlayTimeout) clearTimeout(overlayTimeout);
+
+      playChime(isSuccess);
+      vibrate(isSuccess ? [100, 50, 100] : [300]);
+
+      var overlay = document.getElementById('resultOverlay');
+      overlay.className = 'overlay ' + (isSuccess ? 'success' : 'error');
+      document.getElementById('overlayIcon').innerHTML = isSuccess ? '<i data-lucide="circle-check" style="width:4.5rem;height:4.5rem;color:var(--success);"></i>' : '<i data-lucide="ban" style="width:4.5rem;height:4.5rem;color:var(--error);"></i>';
+      if(typeof lucide !== 'undefined') lucide.createIcons();
+      document.getElementById('overlayTitle').textContent = title;
+      document.getElementById('overlayName').textContent = name;
+      document.getElementById('overlaySub').textContent = sub;
+      document.getElementById('overlayDetails').textContent = details;
+      overlay.style.display = 'flex';
+
+      // Auto-dismiss after 3 seconds for fast queue flow
+      overlayTimeout = setTimeout(dismissOverlay, 3000);
+    }
+
+    function dismissOverlay() {
+      if (overlayTimeout) clearTimeout(overlayTimeout);
+      document.getElementById('resultOverlay').style.display = 'none';
+      isProcessing = false;
+    }
+
+    function addRecentScan(name, qty, success) {
+      var list = document.getElementById('recentList');
+      if (list.querySelector('.recent-item[style*="text-align:center"]')) {
+        list.innerHTML = '';
+      }
+      var item = document.createElement('div');
+      item.className = 'recent-item';
+      var icon = success ? '<i data-lucide="circle-check" style="width:1rem;height:1rem;color:var(--success);display:inline-block;vertical-align:middle;"></i>' : '<i data-lucide="x-circle" style="width:1rem;height:1rem;color:var(--error);display:inline-block;vertical-align:middle;"></i>';
+      item.innerHTML = '<span>' + icon + ' <strong>' + name + '</strong> (' + qty + ')</span>' +
+                       '<span style="color:var(--text-muted); font-size:0.75rem;">' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + '</span>';
+      list.prepend(item);
+      if(typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    // Start scanner on load
+    window.addEventListener('DOMContentLoaded', function() {
+      startScanner();
+      if(typeof lucide !== 'undefined') lucide.createIcons();
+    });
+  </script>
+</body>
+</html>
