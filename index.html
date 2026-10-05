@@ -388,7 +388,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
   <script>
-    var DB_URL = 'https://batch-party-69ac1-default-rtdb.firebaseio.com';
+    var DB_URL = 'https://batch-party-v2-default-rtdb.asia-southeast1.firebasedatabase.app';
     var QR_SECRET = 'REDEUS26-QR-SECRET-2026';
 
     var html5QrCode = null;
@@ -453,7 +453,7 @@
       xhr.send();
     }
     loadTickets();
-    setInterval(loadTickets, 5000);
+    setInterval(loadTickets, 30000);
 
     function updateHeadcount() {
       var list = Object.values(allTickets);
